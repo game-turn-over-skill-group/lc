@@ -210,7 +210,7 @@ eval $command | while read -r line; do
                     dst_ip="[${dst_ip}]"
                 fi
                 # -L参数 排版显示
-                echo "$src_ip:$src_port -> $dst_ip:$dst_port recv_packets: $recv_packets recv_bytes: $recv_bytes send_packets: $send_packets send_bytes: $send_bytes"
+                echo "$src_ip $src_port -> $dst_ip:$dst_port recv_packets: $recv_packets recv_bytes: $recv_bytes send_packets: $send_packets send_bytes: $send_bytes"
             else
                 # 正常匹配输出
                 echo "$line"
