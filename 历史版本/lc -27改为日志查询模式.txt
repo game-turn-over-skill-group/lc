@@ -1,0 +1,32 @@
+
+
+要解决这个问题，可以修改现有的脚本，将连接表的内容先输出到一个日志文件（/tmp/nf_conntrack.log），然后再从这个文件中进行过滤和查询。这样可以避免重复查询 /proc/net/nf_conntrack 导致的性能问题。以下是根据你的要求修改的脚本：
+
+
+
+#!/bin/bash
+
+# 定义日志文件路径
+LOG_FILE="/tmp/nf_conntrack.log"
+
+# 如果日志文件已经存在，删除它
+if [ -f "$LOG_FILE" ]; then
+    rm "$LOG_FILE"
+fi
+
+# 将连接表内容输出到日志文件
+cat /proc/net/nf_conntrack > "$LOG_FILE"
+
+# 读取日志文件并进行过滤
+grep 'dport=8888' "$LOG_FILE" | grep 'ipv4' | grep -E 'packets=[5-9][0-9]{3,}' | grep -vE 'sport=68(1[1-9]|[2-9][0-9])|690[0-9]|6910'
+
+
+
+
+代码解释：
+LOG_FILE：指定日志文件的路径为 /tmp/nf_conntrack.log。
+删除旧的日志文件：在开始新的查询之前，如果日志文件已经存在，会先将其删除，确保每次执行时都是新的数据。
+导出连接表数据：使用 cat /proc/net/nf_conntrack 将当前连接表的数据导出到日志文件中。
+过滤查询：从日志文件中读取数据并应用你之前的过滤条件。
+这样，脚本只会查询一次 /proc/net/nf_conntrack，从而避免了在循环查询过程中可能引发的性能问题或重复条目。你可以试试看这个修改是否解决了你遇到的问题。
+
