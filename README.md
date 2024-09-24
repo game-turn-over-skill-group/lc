@@ -1,6 +1,6 @@
 #  𝕝c  ℍelp 
 ### (openwrt系统) 使用〖lc〗命令 简化查询 路由器连接表
-
+#### (win10系统) 使用〖lc〗命令 支持多窗口同时搜索
 
 #### 【lc】命令：
 ##### 『 L = list 列表 』『 C = conect 连接 』『 连接列表 = List of connections 』
@@ -9,6 +9,17 @@
 #### 创建命令行快捷方式：
 ```css
 ln -s /etc/storage/lc.sh /usr/bin/lc
+```
+#### (win10需要)额外创建快捷方式（Cygwin64 Terminal）：
+```css
+ln -s "D:\\path to your file\\bmd.txt" "/etc/storage/bmd.txt"
+ln -s "D:\\path to your file\\bmd6.txt" "/etc/storage/bmd6.txt"
+ln -s /mnt/c/Users/Administrator/Desktop/nf_conntrack.log /home/Administrator/nf_conntrack.log
+```
+#### (win10需要)在`G:\Cygwin\home\Administrator\.bashrc`文件中添加定义变量
+```bash
+# 使用windows脚本命令
+alias lc='lc.cmd'
 ```
 
 #### 参数：
