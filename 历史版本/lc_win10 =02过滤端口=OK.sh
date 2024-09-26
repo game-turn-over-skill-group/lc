@@ -2,16 +2,11 @@
 
 # 项目地址(project)：https://github.com/game-turn-over-skill-group/lc
 
+# 将连接表内容输出到日志文件(最后将文件下载回系统桌面)
+# cat /proc/net/nf_conntrack > /tmp/nf_conntrack.log
+
 # 定义日志文件路径
-LOG_FILE="/tmp/nf_conntrack.log"
-
-# 如果日志文件已经存在，删除它
-if [ -f "$LOG_FILE" ]; then
-    rm "$LOG_FILE"
-fi
-
-# 将连接表内容输出到日志文件
-cat /proc/net/nf_conntrack > "$LOG_FILE"
+LOG_FILE="./nf_conntrack.log"
 
 # 默认基础命令
 command="cat $LOG_FILE"
@@ -95,52 +90,52 @@ do
             shift  # 移掉选项
             shift  # 移掉选项的参数
             ;;
-        -p|--ports)
-            if [[ $2 ]]; then
-                show_port_list="$2"
-                IFS=',' read -r -a show_ports <<< "$show_port_list"
-                show_pattern=""
-                for show_port in "${show_ports[@]}"; do
-                    if [[ "$show_port" == *"-"* ]]; then
-                        # 提取端口范围
-                        start_port=$(echo "$show_port" | cut -d'-' -f1)
-                        end_port=$(echo "$show_port" | cut -d'-' -f2)
-                        show_pattern+="(port=$start_port )"
-                        for (( port=start_port+1; port<=end_port; port++ )); do
-                            show_pattern+="|(port=$port )"
-                        done
-                    else
-                        show_pattern+="(port=$show_port )|"
-                    fi
-                done
-                show_pattern=${show_pattern%|}  # 移除最后的 ' | '
-                command="$command | grep -E '$show_pattern'"
-            fi
-            shift  # 移掉选项
-            ;;
-        -P|--Ports)
-            if [[ $2 ]]; then
-                filter_port_list="$2"
-                IFS=',' read -r -a filter_ports <<< "$filter_port_list"
-                filter_pattern=""
-                for filter_port in "${filter_ports[@]}"; do
-                    if [[ "$filter_port" == *"-"* ]]; then
-                        # 提取端口范围
-                        start_port=$(echo "$filter_port" | cut -d'-' -f1)
-                        end_port=$(echo "$filter_port" | cut -d'-' -f2)
-                        filter_pattern+="(port=$start_port )"
-                        for (( port=start_port+1; port<=end_port; port++ )); do
-                            filter_pattern+="|(port=$port )"
-                        done
-                    else
-                        filter_pattern+="(port=$filter_port )|"
-                    fi
-                done
-                filter_pattern=${filter_pattern%|}  # 移除最后的 ' | '
-                command="$command | grep -vE '$filter_pattern'"
-            fi
-            shift  # 移掉选项
-            ;;
+		-p|--ports)
+			if [[ $2 ]]; then
+				show_port_list="$2"
+				IFS=',' read -r -a show_ports <<< "$show_port_list"
+				show_pattern=""
+				for show_port in "${show_ports[@]}"; do
+					if [[ "$show_port" == *"-"* ]]; then
+						# 提取端口范围
+						start_port=$(echo "$show_port" | cut -d'-' -f1)
+						end_port=$(echo "$show_port" | cut -d'-' -f2)
+						show_pattern+="(port=$start_port )"
+						for (( port=start_port+1; port<=end_port; port++ )); do
+							show_pattern+="|(port=$port )"
+						done
+					else
+						show_pattern+="(port=$show_port )|"
+					fi
+				done
+				show_pattern=${show_pattern%|}  # 移除最后的 ' | '
+				command="$command | grep -E '$show_pattern'"
+			fi
+			shift  # 移掉选项
+			;;
+		-P|--Ports)
+			if [[ $2 ]]; then
+				filter_port_list="$2"
+				IFS=',' read -r -a filter_ports <<< "$filter_port_list"
+				filter_pattern=""
+				for filter_port in "${filter_ports[@]}"; do
+					if [[ "$filter_port" == *"-"* ]]; then
+						# 提取端口范围
+						start_port=$(echo "$filter_port" | cut -d'-' -f1)
+						end_port=$(echo "$filter_port" | cut -d'-' -f2)
+						filter_pattern+="(port=$start_port )"
+						for (( port=start_port+1; port<=end_port; port++ )); do
+							filter_pattern+="|(port=$port )"
+						done
+					else
+						filter_pattern+="(port=$filter_port )|"
+					fi
+				done
+				filter_pattern=${filter_pattern%|}  # 移除最后的 ' | '
+				command="$command | grep -vE '$filter_pattern'"
+			fi
+			shift  # 移掉选项
+			;;
         -b|-B|--bytes)
             if [[ $2 =~ ^[0-9]+$ ]]; then
                 cmp_bytes=$2
@@ -222,41 +217,37 @@ do
     esac
 done
 
-# 执行基础命令并处理输出
-eval $command | while read -r line; do
-    # 使用 Bash 字符串操作 提取每个字段的原始数据
-    protocol="${line%% *}"  # 提取协议类型
-    # echo "$protocol"
-    src_ip___="${line#*src=}"
-    src_ip="${src_ip___%% *}"  # 提取第1个源 IP
-    # echo "$src_ip"
-    dst_ip___="${line#*dst=}"
-    dst_ip="${dst_ip___%% *}"  # 提取第1个目标 IP
-    # echo "$dst_ip"
-    src_port___="${line#*sport=}"
-    src_port="${src_port___%% *}"  # 提取第1个源端口
-    # echo "$src_port"
-    src2_port___="${src_port___#*sport=}"
-    src2_port="${src2_port___%% *}"  # 提取第2个源端口
-    # echo "$src2_port"
-    dst_port___="${line#*dport=}"
-    dst_port="${dst_port___%% *}"  # 提取第1个目标端口
-    # echo "$dst_port"
-    dst2_port___="${dst_port___#*dport=}"
-    dst2_port="${dst2_port___%% *}"  # 提取第2个目标端口
-    # echo "$dst2_port"
-    src_packets___="${line#*packets=}"
-    src_packets="${src_packets___%% *}"  # 提取第1个数据包数
-    # echo "$src_packets"
-    dst_packets___="${src_packets___#*packets=}"
-    dst_packets="${dst_packets___%% *}"  # 提取第2个数据包数
-    # echo "$dst_packets"
-    src_bytes___="${line#*bytes=}"
-    src_bytes="${src_bytes___%% *}"  # 提取第1个字节数
-    # echo "$src_bytes"
-    dst_bytes___="${src_bytes___#*bytes=}"
-    dst_bytes="${dst_bytes___%% *}"  # 提取第2个字节数
-    # echo "$dst_bytes"
+# 定义临时文件
+temp_file=$(mktemp)
+temp_script=$(mktemp)
+
+# 将命令写入临时脚本
+echo "$command" > "$temp_script"
+# 检查临时脚本是否成功创建并具有内容
+if [[ ! -s "$temp_script" ]]; then
+    echo "临时脚本为空或未成功创建！"
+    exit 1
+fi
+# 给临时脚本添加执行权限
+chmod +x "$temp_script"
+
+# 执行临时脚本并将输出写入临时文件
+"$temp_script" > "$temp_file"
+
+# 读取临时文件进行处理
+while read -r line; do
+    # 提取每个字段的原始数据
+    protocol=$(echo "$line" | awk '{print $1}')
+	src_ip=$(echo "$line" | awk -F'src=' '{print $2}' | awk '{print $1}')
+	dst_ip=$(echo "$line" | awk -F'dst=' '{print $2}' | awk '{print $1}')
+	src_port=$(echo "$line" | awk -F'sport=' '{print $2}' | awk '{print $1}')
+	dst_port=$(echo "$line" | awk -F'dport=' '{print $2}' | awk '{print $1}')
+	src2_port=$(echo "$line" | awk -F'sport=' '{print $3}' | awk '{print $1}')  # 提取第二个源端口
+	dst2_port=$(echo "$line" | awk -F'dport=' '{print $3}' | awk '{print $1}')  # 提取第二个目标端口
+	src_packets=$(echo "$line" | awk -F'packets=' '{print $2}' | awk '{print $1}')
+	src_bytes=$(echo "$line" | awk -F'bytes=' '{print $2}' | awk '{print $1}')
+	dst_packets=$(echo "$line" | awk -F'packets=' '{print $3}' | awk '{print $1}')
+	dst_bytes=$(echo "$line" | awk -F'bytes=' '{print $3}' | awk '{print $1}')
 
     # 检查packets和bytes是否为有效数字
     if [[ $src_packets =~ ^[0-9]+$ && $src_bytes =~ ^[0-9]+$ && $dst_packets =~ ^[0-9]+$ && $dst_bytes =~ ^[0-9]+$ ]]; then
@@ -285,4 +276,8 @@ eval $command | while read -r line; do
         fi
     fi
 
-done
+done < "$temp_file"
+
+# 删除临时文件
+rm "$temp_file"
+rm "$temp_script"
