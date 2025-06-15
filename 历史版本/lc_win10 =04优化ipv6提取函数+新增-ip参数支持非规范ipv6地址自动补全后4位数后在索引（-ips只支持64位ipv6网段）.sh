@@ -2,16 +2,11 @@
 
 # 项目地址(project)：https://github.com/game-turn-over-skill-group/lc
 
+# 将连接表内容输出到日志文件(最后将文件下载回系统桌面)
+# cat /proc/net/nf_conntrack > /tmp/nf_conntrack.log
+
 # 定义日志文件路径
-LOG_FILE="/tmp/nf_conntrack.log"
-
-# 如果日志文件已经存在，删除它
-if [ -f "$LOG_FILE" ]; then
-    rm "$LOG_FILE"
-fi
-
-# 将连接表内容输出到日志文件
-cat /proc/net/nf_conntrack > "$LOG_FILE"
+LOG_FILE="./nf_conntrack.log"
 
 # 默认基础命令
 command="cat $LOG_FILE"
@@ -30,29 +25,58 @@ Default_Path_File="/etc/storage/bmd.txt"
 normalize_ipv6() {
     local ipv6=$1
 
-    # 检查是否包含::
-    if [[ $ipv6 == *"::"* ]]; then
-        # 处理包含::的情况：删除::后的内容，并规范化前面的部分
-        local before=${ipv6%%::*}  # 提取::前的部分
-        # 用0填充每一段
-        local segments=$(echo "$before" | tr ':' '\n')
-        local count=$(echo "$segments" | wc -l)
-        local full_address=""
-        local i=1
+    # 处理CIDR网段
+    if [[ $ipv6 == */* ]]; then
+        local address=${ipv6%%/*}
+        local prefix=${ipv6#*/}
 
-        while IFS= read -r segment; do
-            segment=$(echo "$segment" | sed 's/^0*//')
-            if [[ -z "$segment" ]]; then
-                segment="0000"
-            fi
-            full_address+=$(printf "%04x" "$((16#$segment))")
-            if [[ $i -lt $count ]]; then
-                full_address+=":"
-            fi
-            ((i++))
-        done <<< "$segments"
+        # 检查是否包含::
+        if [[ $address == *"::"* ]]; then
+            # 处理包含::的情况：删除::后的内容，并规范化前面的部分
+            local before=${address%%::*}  # 提取::前的部分
+            # 用0填充每一段
+            local segments=$(echo "$before" | tr ':' '\n')
+            local count=$(echo "$segments" | wc -l)
+            local full_address=""
+            local i=1
 
-        echo "$full_address"    # 输出规范化后的地址（不包含网段信息）
+            while IFS= read -r segment; do
+                segment=$(echo "$segment" | sed 's/^0*//')
+                if [[ -z "$segment" ]]; then
+                    segment="0000"
+                fi
+                full_address+=$(printf "%04x" "$((16#$segment))")
+                if [[ $i -lt $count ]]; then
+                    full_address+=":"
+                fi
+                ((i++))
+            done <<< "$segments"
+            
+            # 输出规范化后的地址（不包含网段信息）
+            echo "$full_address"
+        else
+            # 处理不包含::的情况（可能是不完整的IPv6地址）
+            local segments=$(echo "$address" | tr ':' '\n')
+            local count=$(echo "$segments" | wc -l)
+            
+            # 用0填充每一段
+            local full_address=""
+            local i=1
+            while IFS= read -r segment; do
+                segment=$(echo "$segment" | sed 's/^0*//')
+                if [[ -z "$segment" ]]; then
+                    segment="0000"
+                fi
+                full_address+=$(printf "%04x" "$((16#$segment))")
+                if [[ $i -lt $count ]]; then
+                    full_address+=":"
+                fi
+                ((i++))
+            done <<< "$segments"
+            
+            # 加上网络前缀
+            echo "$full_address/$prefix"
+        fi
     else
         # 处理不包含::的情况（可能是不完整的IPv6地址）
         local segments=$(echo "$ipv6" | tr ':' '\n')
@@ -60,7 +84,6 @@ normalize_ipv6() {
         # 用0填充每一段
         local full_address=""
         local i=1
-
         while IFS= read -r segment; do
             segment=$(echo "$segment" | sed 's/^0*//')
             if [[ -z "$segment" ]]; then
@@ -73,7 +96,7 @@ normalize_ipv6() {
             ((i++))
         done <<< "$segments"
 
-        echo "$full_address"    # 输出规范化后的地址（不包含网段信息）
+        echo "$full_address"
     fi
 }
 
@@ -97,52 +120,52 @@ do
             shift  # 移掉选项
             shift  # 移掉选项的参数
             ;;
-        -p|--ports)
-            if [[ $2 ]]; then
-                show_port_list="$2"
-                IFS=',' read -r -a show_ports <<< "$show_port_list"
-                show_pattern=""
-                for show_port in "${show_ports[@]}"; do
-                    if [[ "$show_port" == *"-"* ]]; then
-                        # 提取端口范围
-                        start_port=$(echo "$show_port" | cut -d'-' -f1)
-                        end_port=$(echo "$show_port" | cut -d'-' -f2)
-                        show_pattern+="(port=$start_port )"
-                        for (( port=start_port+1; port<=end_port; port++ )); do
-                            show_pattern+="|(port=$port )"
-                        done
-                    else
-                        show_pattern+="(port=$show_port )|"
-                    fi
-                done
-                show_pattern=${show_pattern%|}  # 移除最后的 ' | '
-                command="$command | grep -E '$show_pattern'"
-            fi
-            shift  # 移掉选项
-            ;;
-        -P|--Ports)
-            if [[ $2 ]]; then
-                filter_port_list="$2"
-                IFS=',' read -r -a filter_ports <<< "$filter_port_list"
-                filter_pattern=""
-                for filter_port in "${filter_ports[@]}"; do
-                    if [[ "$filter_port" == *"-"* ]]; then
-                        # 提取端口范围
-                        start_port=$(echo "$filter_port" | cut -d'-' -f1)
-                        end_port=$(echo "$filter_port" | cut -d'-' -f2)
-                        filter_pattern+="(port=$start_port )"
-                        for (( port=start_port+1; port<=end_port; port++ )); do
-                            filter_pattern+="|(port=$port )"
-                        done
-                    else
-                        filter_pattern+="(port=$filter_port )|"
-                    fi
-                done
-                filter_pattern=${filter_pattern%|}  # 移除最后的 ' | '
-                command="$command | grep -vE '$filter_pattern'"
-            fi
-            shift  # 移掉选项
-            ;;
+		-p|--ports)
+			if [[ $2 ]]; then
+				show_port_list="$2"
+				IFS=',' read -r -a show_ports <<< "$show_port_list"
+				show_pattern=""
+				for show_port in "${show_ports[@]}"; do
+					if [[ "$show_port" == *"-"* ]]; then
+						# 提取端口范围
+						start_port=$(echo "$show_port" | cut -d'-' -f1)
+						end_port=$(echo "$show_port" | cut -d'-' -f2)
+						show_pattern+="(port=$start_port )"
+						for (( port=start_port+1; port<=end_port; port++ )); do
+							show_pattern+="|(port=$port )"
+						done
+					else
+						show_pattern+="(port=$show_port )|"
+					fi
+				done
+				show_pattern=${show_pattern%|}  # 移除最后的 ' | '
+				command="$command | grep -E '$show_pattern'"
+			fi
+			shift  # 移掉选项
+			;;
+		-P|--Ports)
+			if [[ $2 ]]; then
+				filter_port_list="$2"
+				IFS=',' read -r -a filter_ports <<< "$filter_port_list"
+				filter_pattern=""
+				for filter_port in "${filter_ports[@]}"; do
+					if [[ "$filter_port" == *"-"* ]]; then
+						# 提取端口范围
+						start_port=$(echo "$filter_port" | cut -d'-' -f1)
+						end_port=$(echo "$filter_port" | cut -d'-' -f2)
+						filter_pattern+="(port=$start_port )"
+						for (( port=start_port+1; port<=end_port; port++ )); do
+							filter_pattern+="|(port=$port )"
+						done
+					else
+						filter_pattern+="(port=$filter_port )|"
+					fi
+				done
+				filter_pattern=${filter_pattern%|}  # 移除最后的 ' | '
+				command="$command | grep -vE '$filter_pattern'"
+			fi
+			shift  # 移掉选项
+			;;
         -b|-B|--bytes)
             if [[ $2 =~ ^[0-9]+$ ]]; then
                 cmp_bytes=$2
@@ -161,7 +184,7 @@ do
             if [[ $2 ]]; then
                 if [[ $2 =~ : ]]; then  # 判断是否为 IPv6 地址或网段（通过包含 ":" 来识别）
                     normalized_ip=$(normalize_ipv6 "$2")    # 调用规范化函数处理 IPv6 地址
-                    # echo "$normalized_ip" # debug：输出ipv6地址 查看函数调用情况
+                    echo "$normalized_ip"
                     command="$command | grep -a '$normalized_ip'"
                 else
                     command="$command | grep -a '$2'"   # 非 IPv6 地址按原逻辑处理
@@ -193,10 +216,13 @@ do
                     
                     # 处理 IPv6 地址和网段
                     elif [[ $line =~ ^([0-9a-fA-F:]+)(/[0-9]+)?$ ]]; then
-                        # 调用规范化函数（自动处理网段和补零）
-                        full_ipv6=$(normalize_ipv6 "$line")
-                        # 直接使用规范化后的完整地址作为匹配前缀
-                        prefix="$full_ipv6"
+                        if [[ $line =~ /64$ ]]; then
+                            full_ipv6=$(normalize_ipv6 "$line")
+                            prefix="${full_ipv6:0:4}:${full_ipv6:5:4}:${full_ipv6:10:4}:${full_ipv6:15:4}"
+                        else
+                            full_ipv6=$(normalize_ipv6 "$line")
+                            prefix="${full_ipv6:0:4}:${full_ipv6:5:4}:${full_ipv6:10:4}:${full_ipv6:15:4}:${full_ipv6:20:4}:${full_ipv6:25:4}:${full_ipv6:30:4}:${full_ipv6:35:4}"
+                        fi
                         ip_list="$ip_list$prefix|"
                     else
                         ip_list="$ip_list$line|"
@@ -227,41 +253,58 @@ do
     esac
 done
 
-# 执行基础命令并处理输出
-eval $command | while read -r line; do
-    # 使用 Bash 字符串操作 提取每个字段的原始数据
-    protocol="${line%% *}"  # 提取协议类型
-    # echo "$protocol"
-    src_ip___="${line#*src=}"
-    src_ip="${src_ip___%% *}"  # 提取第1个源 IP
-    # echo "$src_ip"
-    dst_ip___="${line#*dst=}"
-    dst_ip="${dst_ip___%% *}"  # 提取第1个目标 IP
-    # echo "$dst_ip"
-    src_port___="${line#*sport=}"
-    src_port="${src_port___%% *}"  # 提取第1个源端口
-    # echo "$src_port"
-    src2_port___="${src_port___#*sport=}"
-    src2_port="${src2_port___%% *}"  # 提取第2个源端口
-    # echo "$src2_port"
-    dst_port___="${line#*dport=}"
-    dst_port="${dst_port___%% *}"  # 提取第1个目标端口
-    # echo "$dst_port"
-    dst2_port___="${dst_port___#*dport=}"
-    dst2_port="${dst2_port___%% *}"  # 提取第2个目标端口
-    # echo "$dst2_port"
-    src_packets___="${line#*packets=}"
-    src_packets="${src_packets___%% *}"  # 提取第1个数据包数
-    # echo "$src_packets"
-    dst_packets___="${src_packets___#*packets=}"
-    dst_packets="${dst_packets___%% *}"  # 提取第2个数据包数
-    # echo "$dst_packets"
-    src_bytes___="${line#*bytes=}"
-    src_bytes="${src_bytes___%% *}"  # 提取第1个字节数
-    # echo "$src_bytes"
-    dst_bytes___="${src_bytes___#*bytes=}"
-    dst_bytes="${dst_bytes___%% *}"  # 提取第2个字节数
-    # echo "$dst_bytes"
+# 定义临时文件
+temp_file=$(mktemp)
+temp_script=$(mktemp)
+
+# 将命令写入临时脚本
+echo "$command" > "$temp_script"
+# 检查临时脚本是否成功创建并具有内容
+if [[ ! -s "$temp_script" ]]; then
+    echo "临时脚本为空或未成功创建！"
+    exit 1
+fi
+# 给临时脚本添加执行权限
+chmod +x "$temp_script"
+
+# 执行临时脚本并将输出写入临时文件
+"$temp_script" > "$temp_file"
+
+# 读取临时文件进行处理
+while read -r line; do
+	# 使用 Bash 字符串操作 提取每个字段的原始数据
+	protocol="${line%% *}"  # 提取协议类型
+	# echo "$protocol"
+	src_ip___="${line#*src=}"
+	src_ip="${src_ip___%% *}"  # 提取第1个源 IP
+	# echo "$src_ip"
+	dst_ip___="${line#*dst=}"
+	dst_ip="${dst_ip___%% *}"  # 提取第1个目标 IP
+	# echo "$dst_ip"
+	src_port___="${line#*sport=}"
+	src_port="${src_port___%% *}"  # 提取第1个源端口
+	# echo "$src_port"
+	src2_port___="${src_port___#*sport=}"
+	src2_port="${src2_port___%% *}"  # 提取第2个源端口
+	# echo "$src2_port"
+	dst_port___="${line#*dport=}"
+	dst_port="${dst_port___%% *}"  # 提取第1个目标端口
+	# echo "$dst_port"
+	dst2_port___="${dst_port___#*dport=}"
+	dst2_port="${dst2_port___%% *}"  # 提取第2个目标端口
+	# echo "$dst2_port"
+	src_packets___="${line#*packets=}"
+	src_packets="${src_packets___%% *}"  # 提取第1个数据包数
+	# echo "$src_packets"
+	dst_packets___="${src_packets___#*packets=}"
+	dst_packets="${dst_packets___%% *}"  # 提取第2个数据包数
+	# echo "$dst_packets"
+	src_bytes___="${line#*bytes=}"
+	src_bytes="${src_bytes___%% *}"  # 提取第1个字节数
+	# echo "$src_bytes"
+	dst_bytes___="${src_bytes___#*bytes=}"
+	dst_bytes="${dst_bytes___%% *}"  # 提取第2个字节数
+	# echo "$dst_bytes"
 
     # 检查packets和bytes是否为有效数字
     if [[ $src_packets =~ ^[0-9]+$ && $src_bytes =~ ^[0-9]+$ && $dst_packets =~ ^[0-9]+$ && $dst_bytes =~ ^[0-9]+$ ]]; then
@@ -290,4 +333,8 @@ eval $command | while read -r line; do
         fi
     fi
 
-done
+done < "$temp_file"
+
+# 删除临时文件
+rm "$temp_file"
+rm "$temp_script"
