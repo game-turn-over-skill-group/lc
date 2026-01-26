@@ -10,7 +10,7 @@ if [ -f "$LOG_FILE" ]; then
     rm "$LOG_FILE"
 fi
 
-# 将连接表内容输出到日志文件
+# 将连接表内容输出到日志文件 OK
 { conntrack -L --zone 0 -f ipv4 2>/dev/null | sed 's/^/ipv4    0 /'; conntrack -L --zone 0 -f ipv6 2>/dev/null | sed 's/^/ipv6    0 /'; } > "$LOG_FILE"
 
 # 默认基础命令
