@@ -21,110 +21,57 @@ port_range=""
 # 定义默认路径文件
 Default_Path_File="/etc/storage/bmd.txt"
 
-# 创建函数：规范化IPv6地址（旧版本用cat输出LOG用的 新版本已弃用）
+# 创建函数：规范化IPv6地址
 normalize_ipv6() {
     local ipv6=$1
-    local full_address=""
-    local i=1
 
     # 检查是否包含::
     if [[ $ipv6 == *"::"* ]]; then
         # 处理包含::的情况：删除::后的内容，并规范化前面的部分
         local before=${ipv6%%::*}  # 提取::前的部分
-        local segments=$(echo "$before" | tr ':' '\n')
-        local count=$(echo "$segments" | wc -l)
+#        # 用0填充每一段
+#        local segments=$(echo "$before" | tr ':' '\n')
+#        local count=$(echo "$segments" | wc -l)
+#        local full_address=""
+#        local i=1
 
-        # 用0填充每一段
-        while IFS= read -r segment; do
-            segment=$(echo "$segment" | sed 's/^0*//')
-            if [[ -z "$segment" ]]; then
-                segment="0000"
-            fi
-            full_address+=$(printf "%04x" "$((16#$segment))")
-            if [[ $i -lt $count ]]; then
-                full_address+=":"
-            fi
-            ((i++))
-        done <<< "$segments"
+#        while IFS= read -r segment; do
+#            segment=$(echo "$segment" | sed 's/^0*//')
+#            if [[ -z "$segment" ]]; then
+#                segment="0000"
+#            fi
+#            full_address+=$(printf "%04x" "$((16#$segment))")
+#            if [[ $i -lt $count ]]; then
+#                full_address+=":"
+#            fi
+#            ((i++))
+#        done <<< "$segments"
 
-#        echo "$before" # 直接返回原始未补齐的::前地址
-
+#        echo "$full_address"    # 输出规范化后的地址（不包含网段信息）
+        echo "$before" # 直接返回原始未补齐的::前地址
     else
+#        # 处理不包含::的情况（可能是不完整的IPv6地址）
+#        local segments=$(echo "$ipv6" | tr ':' '\n')
+#        local count=$(echo "$segments" | wc -l)
+#        # 用0填充每一段
+#        local full_address=""
+#        local i=1
 
-        # 处理不包含::的情况（可能是不完整的IPv6地址）
-        local segments=$(echo "$ipv6" | tr ':' '\n')
-        local count=$(echo "$segments" | wc -l)
+#        while IFS= read -r segment; do
+#            segment=$(echo "$segment" | sed 's/^0*//')
+#            if [[ -z "$segment" ]]; then
+#                segment="0000"
+#            fi
+#            full_address+=$(printf "%04x" "$((16#$segment))")
+#            if [[ $i -lt $count ]]; then
+#                full_address+=":"
+#            fi
+#            ((i++))
+#        done <<< "$segments"
 
-        # 用0填充每一段
-        while IFS= read -r segment; do
-            segment=$(echo "$segment" | sed 's/^0*//')
-            if [[ -z "$segment" ]]; then
-                segment="0000"
-            fi
-            full_address+=$(printf "%04x" "$((16#$segment))")
-            if [[ $i -lt $count ]]; then
-                full_address+=":"
-            fi
-            ((i++))
-        done <<< "$segments"
-
-#        echo "$ipv6" # 直接返回原始未补齐的地址
-
+#        echo "$full_address"    # 输出规范化后的地址（不包含网段信息）
+        echo "$ipv6" # 直接返回原始未补齐的地址
     fi
-    echo "$full_address"    # 输出规范化后的地址（不包含网段信息）
-}
-
-# 创建函数：简化IPv6地址（输出简化格式，去除前导0）
-simplify_ipv6() {
-    local ipv6=$1
-    local full_address=""
-    local i=1
-
-    # 检查是否包含::
-    if [[ $ipv6 == *"::"* ]]; then
-        # 处理包含::的情况：仅保留::前的部分，并简化（去除前导0）
-        local before=${ipv6%%::*}  # 提取::前的部分
-        local segments=$(echo "$before" | tr ':' '\n')
-        local count=$(echo "$segments" | wc -l)
-
-        while IFS= read -r segment; do
-            # 核心：全0段保留为0，非全0段删除前导0
-            if [[ -z "$segment" || "$segment" =~ ^0+$ ]]; then
-                segment="0"
-            else
-                segment=$(echo "$segment" | sed 's/^0*//')
-            fi
-            full_address+="$segment"
-            # 段间添加:（最后一段不加）
-            if [[ $i -lt $count ]]; then
-                full_address+=":"
-            fi
-            ((i++))
-        done <<< "$segments"
-
-    else
-
-        # 处理不包含::的情况（简化格式，去除前导0）
-        local segments=$(echo "$ipv6" | tr ':' '\n')
-        local count=$(echo "$segments" | wc -l)
-
-        while IFS= read -r segment; do
-            # 核心修复：全0段保留为0，非全0段删除前导0（避免空段导致::）
-            if [[ -z "$segment" || "$segment" =~ ^0+$ ]]; then
-                segment="0"  # 空段/全0段统一保留为0
-            else
-                segment=$(echo "$segment" | sed 's/^0*//')  # 仅删前导0
-            fi
-            full_address+="$segment"
-            # 段间添加分隔符，最后一段不加
-            if [[ $i -lt $count ]]; then
-                full_address+=":"
-            fi
-            ((i++))
-        done <<< "$segments"
-
-    fi
-    echo "$full_address"    # 输出简化后的地址（无多余前导0）
 }
 
 # 处理参数
@@ -210,7 +157,7 @@ do
         -ip|-IP)
             if [[ $2 ]]; then
                 if [[ $2 =~ : ]]; then  # 判断是否为 IPv6 地址或网段（通过包含 ":" 来识别）
-                    normalized_ip=$(simplify_ipv6 "$2")    # 调用简化函数处理 IPv6 地址
+                    normalized_ip=$(normalize_ipv6 "$2")    # 调用规范化函数处理 IPv6 地址
                     #echo "$normalized_ip" # debug：输出ipv6地址 查看函数调用情况
                     command="$command | grep -a '$normalized_ip'"
                 else
@@ -243,8 +190,8 @@ do
                     
                     # 处理 IPv6 地址和网段
                     elif [[ $line =~ ^([0-9a-fA-F:]+)(/[0-9]+)?$ ]]; then
-                        # 调用规范化函数（自动处理网段和清零）
-                        full_ipv6=$(simplify_ipv6 "$line")
+                        # 调用规范化函数（自动处理网段和补零）
+                        full_ipv6=$(normalize_ipv6 "$line")
                         # 直接使用规范化后的完整地址作为匹配前缀
                         prefix="$full_ipv6"
                         ip_list="$ip_list$prefix|"
