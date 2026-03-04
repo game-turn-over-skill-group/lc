@@ -16,6 +16,10 @@ ln -s "D:\\path to your file\\bmd.txt" "/etc/storage/bmd.txt"
 ln -s "D:\\path to your file\\bmd6.txt" "/etc/storage/bmd6.txt"
 ln -s /mnt/c/Users/Administrator/Desktop/nf_conntrack.log /home/Administrator/nf_conntrack.log
 ```
+#### 验证是否生效
+```css
+cat /etc/storage/bmd.txt
+```
 #### (win10需要)在`G:\Cygwin\home\Administrator\.bashrc`文件中添加定义变量
 ```bash
 # 使用windows脚本命令
