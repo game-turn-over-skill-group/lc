@@ -1,4 +1,7 @@
-#  𝕝c  ℍelp 
+#  𝕝c  ℍelp
+
+#### [English Version](README_EN.md)
+
 ### (openwrt系统) 使用〖lc〗命令 简化查询 路由器连接表
 #### (win10系统) 使用〖lc〗命令 支持多窗口同时搜索
 
