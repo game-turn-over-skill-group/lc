@@ -133,6 +133,14 @@ do
     key="$1"
 
     case $key in
+        -4)
+            command="$command | grep 'ipv4'"
+            shift  # 移掉选项
+            ;;
+        -6)
+            command="$command | grep 'ipv6'"
+            shift  # 移掉选项
+            ;;
         -i|-I|--internet)
             if [[ $2 == "ipv4" || $2 == "ipv6" ]]; then
                 command="$command | grep '$2'"
@@ -153,14 +161,22 @@ do
 				IFS=',' read -r -a show_ports <<< "$show_port_list"
 				show_pattern=""
 				for show_port in "${show_ports[@]}"; do
-					if [[ "$show_port" == *"-"* ]]; then
-						# 提取端口范围
-						start_port=$(echo "$show_port" | cut -d'-' -f1)
-						end_port=$(echo "$show_port" | cut -d'-' -f2)
+					# 支持 - 或 : 作为端口范围分隔符
+					if [[ "$show_port" == *"-("* ]]; then
+						# 已经是范围格式（包含 -()），直接使用
+						show_pattern+="(port=$show_port )|"
+					elif [[ "$show_port" == *":("* ]]; then
+						# 已经是范围格式（包含 :()），直接使用
+						show_pattern+="(port=$show_port )|"
+					elif [[ "$show_port" =~ ^([0-9]+)(-|:)([0-9]+)$ ]]; then
+						# 提取端口范围（支持 - 或 : 分隔符）
+						start_port="${show_port%%[-:]*}"
+						end_port="${show_port##*[-:]}"
 						show_pattern+="(port=$start_port )"
 						for (( port=start_port+1; port<=end_port; port++ )); do
 							show_pattern+="|(port=$port )"
 						done
+						show_pattern+="|"
 					else
 						show_pattern+="(port=$show_port )|"
 					fi
@@ -176,14 +192,22 @@ do
 				IFS=',' read -r -a filter_ports <<< "$filter_port_list"
 				filter_pattern=""
 				for filter_port in "${filter_ports[@]}"; do
-					if [[ "$filter_port" == *"-"* ]]; then
-						# 提取端口范围
-						start_port=$(echo "$filter_port" | cut -d'-' -f1)
-						end_port=$(echo "$filter_port" | cut -d'-' -f2)
+					# 支持 - 或 : 作为端口范围分隔符
+					if [[ "$filter_port" == *"-("* ]]; then
+						# 已经是范围格式（包含 -()），直接使用
+						filter_pattern+="(port=$filter_port )|"
+					elif [[ "$filter_port" == *":("* ]]; then
+						# 已经是范围格式（包含 :()），直接使用
+						filter_pattern+="(port=$filter_port )|"
+					elif [[ "$filter_port" =~ ^([0-9]+)(-|:)([0-9]+)$ ]]; then
+						# 提取端口范围（支持 - 或 : 分隔符）
+						start_port="${filter_port%%[-:]*}"
+						end_port="${filter_port##*[-:]}"
 						filter_pattern+="(port=$start_port )"
 						for (( port=start_port+1; port<=end_port; port++ )); do
 							filter_pattern+="|(port=$port )"
 						done
+						filter_pattern+="|"
 					else
 						filter_pattern+="(port=$filter_port )|"
 					fi
